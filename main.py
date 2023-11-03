@@ -1,4 +1,5 @@
 import pandas as pd
+import random
 
 class zipCount:
     def __init__(self, zip, count):
@@ -49,11 +50,10 @@ for index, row in creditNote.iterrows():
                     if x.zip == currentZip:
                         x.count += 1
                         zipExists = True
-                
-                if zipExists == False:
-                    i.zipList.append(zc)
-
-                break
+                        break
+        
+        if zipExists == False:
+            i.zipList.append(zc)
                     
         duplicateCount += 1
 
@@ -72,6 +72,35 @@ for index, row in transactions.iterrows():
                 i.count += 1
                 break
 
+def randomCheck():
+    testResult = True
+
+    for i in range(100):
+        x = random.choice(master)
+
+        for y in x.zipList:
+            testCount = 0
+
+            for index, row in creditNote.iterrows():
+                tempKey = creditNote.loc[index, "CombinedKey"]
+                tempZip = creditNote.loc[index, "zip_area__c"]
+
+                # print(tempKey)
+                # print(tempZip)
+
+                if tempKey.__eq__(x.key) and tempZip.__eq__(y.zip):
+                    testCount += 1
+            
+            if testCount != y.count:
+                print("Invalid Key: " + x.key)
+                print("Invalid Zip: " + y.zip)
+                print("Master Zip Count: " + str(y.count))
+                print("Test Count: " + str(testCount))
+                testResult = False
+                return testResult
+
+    return testResult
+            
 with open('output.txt', 'w') as f:
     f.write("---Credit Note Combination Key + Zip/Zip Counts---" + "\n")
     for i in master:
@@ -108,7 +137,10 @@ with open('output.txt', 'w') as f:
                 else:
                     continue
     
+    randomResult = randomCheck()
+
     f.write("Total Unique Combination Keys - Credit Note: " + str(len(master)) + "\n")
     f.write("Total Duplicate Combination Keys in Credit Note: " + str(duplicateCount) + "\n")
     f.write("Total Combination Key Mismatches: " + str(mismatch) + "\n")
-    f.write("Total Invalid CK Count - Credit Note < Transaction Lines: " + str(invalid))
+    f.write("Total Invalid CK Count - Credit Note < Transaction Lines: " + str(invalid) + "\n")
+    # f.write("Random Validation of Combo Key + Zip Count Result: " + str(randomResult))
