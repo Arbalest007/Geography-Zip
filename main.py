@@ -35,25 +35,38 @@ for index, row in creditNote.iterrows():
     currentZip = creditNote.loc[index, "zip_area__c"]
     # print(currentKey)
 
+    zc = zipCount(currentZip, 1)
+    ck = combinedKey(currentKey, [zc])
+
     if currentKey not in processedKeys:
         processedKeys.append(currentKey)
-
-        zc = zipCount(currentZip, 1)
-        ck = combinedKey(currentKey, [zc])
         master.append(ck)
     else:
         for i in master:
             if i.key == currentKey:
+                print("Match Found!")
+                print(i.key)
+                print(currentKey)
+
                 zipExists = False
 
                 for x in i.zipList:
                     if x.zip == currentZip:
+                        print("Zip Match Found!")
+                        print(x.zip)
+                        print(currentZip)
+
                         x.count += 1
+                        print(str(x.count))
+
                         zipExists = True
-                        break
-        
-        if zipExists == False:
-            i.zipList.append(zc)
+
+                if zipExists == False:
+                    i.zipList.append(zc)
+                
+                break
+            else:
+                continue
                     
         duplicateCount += 1
 
@@ -72,11 +85,11 @@ for index, row in transactions.iterrows():
                 i.count += 1
                 break
 
-def randomCheck():
-    testResult = True
+def cnCheck():
+    testResult = "PASS"
 
-    for i in range(100):
-        x = random.choice(master)
+    for i in master:
+        x = i
 
         for y in x.zipList:
             testCount = 0
@@ -88,7 +101,7 @@ def randomCheck():
                 # print(tempKey)
                 # print(tempZip)
 
-                if tempKey.__eq__(x.key) and tempZip.__eq__(y.zip):
+                if tempKey == x.key and tempZip == y.zip:
                     testCount += 1
             
             if testCount != y.count:
@@ -96,7 +109,7 @@ def randomCheck():
                 print("Invalid Zip: " + y.zip)
                 print("Master Zip Count: " + str(y.count))
                 print("Test Count: " + str(testCount))
-                testResult = False
+                testResult = "FAIL"
                 return testResult
 
     return testResult
@@ -136,11 +149,9 @@ with open('output.txt', 'w') as f:
                         invalid += 1
                 else:
                     continue
-    
-    randomResult = randomCheck()
 
     f.write("Total Unique Combination Keys - Credit Note: " + str(len(master)) + "\n")
     f.write("Total Duplicate Combination Keys in Credit Note: " + str(duplicateCount) + "\n")
-    f.write("Total Combination Key Mismatches: " + str(mismatch) + "\n")
-    f.write("Total Invalid CK Count - Credit Note < Transaction Lines: " + str(invalid) + "\n")
-    # f.write("Random Validation of Combo Key + Zip Count Result: " + str(randomResult))
+    f.write("Total Combination Key Mismatches --- Credit Note VS Transaction Lines: " + str(mismatch) + "\n")
+    f.write("Total Invalid Combination Key Count --- Credit Note < Transaction Lines: " + str(invalid) + "\n")
+    f.write("Validation of CN Combination Key + Zip Count Result: " + cnCheck())
