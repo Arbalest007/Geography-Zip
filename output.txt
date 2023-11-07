@@ -27711,4 +27711,5 @@ Total Unique Combination Keys - Credit Note: 6415
 Total Duplicate Combination Keys in Credit Note: 3187
 Total Combination Key Mismatches --- Credit Note VS Transaction Lines: 220
 Total Invalid Combination Key Count --- Credit Note < Transaction Lines: 25
-Validation of CN Combination Key + Zip Count Result: PASS
+All Totals Match Sum of ZIP Counts: True
+Master List ZIPs Sorted Successfully: True

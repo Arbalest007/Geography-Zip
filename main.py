@@ -10,6 +10,7 @@ class combinedKey:
     def __init__(self, key, zipList):
         self.key = key
         self.zipList = zipList
+        self.total = 0
 
 class transactKey:
     def __init__(self, key):
@@ -22,8 +23,8 @@ master = []
 transactionsKeys = []
 transactMaster = []
 
-path_transactions = "C:\\Users\\patri\\Downloads\\transactionsZIP.csv"
-path_creditNote = "C:\\Users\\patri\\Downloads\\salescreditnoteZIP.csv"
+path_transactions = "C:\\Users\\PatrickLin\\Downloads\\transactionsZIP.csv"
+path_creditNote = "C:\\Users\\PatrickLin\\Downloads\\salescreditnoteZIP.csv"
 
 transactions = pd.read_csv(path_transactions)
 creditNote = pd.read_csv(path_creditNote)
@@ -40,26 +41,29 @@ for index, row in creditNote.iterrows():
 
     if currentKey not in processedKeys:
         processedKeys.append(currentKey)
+        ck.total += 1
         master.append(ck)
     else:
         for i in master:
             if i.key == currentKey:
-                print("Match Found!")
-                print(i.key)
-                print(currentKey)
+                # print("Match Found!")
+                # print(i.key)
+                # print(currentKey)
 
                 zipExists = False
 
                 for x in i.zipList:
                     if x.zip == currentZip:
-                        print("Zip Match Found!")
-                        print(x.zip)
-                        print(currentZip)
+                        # print("Zip Match Found!")
+                        # print(x.zip)
+                        # print(currentZip)
 
                         x.count += 1
-                        print(str(x.count))
+                        # print(str(x.count))
 
                         zipExists = True
+
+                i.total += 1
 
                 if zipExists == False:
                     i.zipList.append(zc)
@@ -154,4 +158,52 @@ with open('output.txt', 'w') as f:
     f.write("Total Duplicate Combination Keys in Credit Note: " + str(duplicateCount) + "\n")
     f.write("Total Combination Key Mismatches --- Credit Note VS Transaction Lines: " + str(mismatch) + "\n")
     f.write("Total Invalid Combination Key Count --- Credit Note < Transaction Lines: " + str(invalid) + "\n")
-    f.write("Validation of CN Combination Key + Zip Count Result: " + cnCheck())
+    # f.write("Validation of CN Combination Key + Zip Count Result: " + cnCheck())
+
+    # -----Process Transactions file w/ Credit Note Results-----
+
+    def checkCount():
+        match = True
+
+        for i in master:
+            count = 0
+
+            for x in i.zipList:
+                count += x.count
+
+            if count != i.total:
+                match = False
+                break
+        
+        return match
+
+    f.write("All Totals Match Sum of ZIP Counts: " + str(checkCount()) + "\n")
+
+    def returnZIPCount(x):
+        return x.count
+
+    def sortZIP():
+        for i in master:
+            i.zipList.sort(key = lambda x: x.count)
+
+    def checkSort():
+        sorted = True
+
+        for i in master:
+            count = 0
+
+            for x in i.zipList:
+                if count == 0:
+                    count == x.count
+                    continue
+                else:
+                    if count > x.count:
+                        sorted = False
+        
+        return sorted
+    
+    sortZIP()
+
+    f.write("Master List ZIPs Sorted Successfully: " + str(checkSort()) + "\n")
+
+    
