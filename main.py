@@ -18,19 +18,183 @@ class transactKey:
         self.key = key
         self.count = 1
 
+class zip:
+    def __init__(self, key, region):
+        self.key = key
+        self.region = region
+
 processedKeys = []
 master = []
 
 transactionsKeys = []
 transactMaster = []
 
-path_transactions = "C:\\Users\\PatrickLin\\Documents\\trn_lines.csv"
-path_creditNote = "C:\\Users\\PatrickLin\\Documents\\sc_lines.csv"
+zipMaster = []
+
+path_transactions = "C:\\Users\\patri\\Documents\\trn_lines.csv"
+path_creditNote = "C:\\Users\\patri\\Documents\\sc_lines.csv"
+path_zipArea = "C:\\Users\\patri\\Documents\\ziparea.csv"
 
 transactions = pd.read_csv(path_transactions)
 creditNote = pd.read_csv(path_creditNote)
+zipArea = pd.read_csv(path_zipArea)
 
 duplicateCount = 0
+
+for index, row in zipArea.iterrows():
+    currentZip = zipArea.loc[index, "ID"]
+    currentRegion = zipArea.loc[index, "REGION__C"]
+
+    newZip = zip(currentZip, currentRegion)
+
+    zipMaster.append(newZip)
+
+def checkZip():
+    correctedZips = 0
+    NoZip = 0
+
+    for index, row in creditNote.iterrows():
+        currentZip = creditNote.loc[index, "ZIP_AREA__C"]
+        currentRegion = creditNote.loc[index, "REGION__C"]
+
+        if currentZip == "No Zip Available":
+            NoZip += 1
+            continue
+        else:
+            try:
+                matchedKey = next(x for x in zipMaster if x.key == currentZip)
+            except:
+                print(currentZip)
+                print(currentRegion)
+                print("Error finding matching ZIP ---CONTINUING---")
+                continue
+        
+            if matchedKey.region != currentRegion:
+                creditNote.loc[index, "REGION__C"] = matchedKey.region
+                creditNote.loc[index, "NEW REGION"] = "TRUE"
+                correctedZips += 1
+            else:
+                creditNote.loc[index, "NEW REGION"] = "FALSE"
+                continue
+    
+    print("NoZip Count: " + str(NoZip))
+
+    return correctedZips
+
+def checkZipFINAL():
+    correctedZips = 0
+    NoZip = 0
+
+    for index, row in transactions.iterrows():
+        currentZip = transactions.loc[index, "ZIP"]
+        currentRegion = transactions.loc[index, "REGION__C"]
+
+        if currentZip == "No Zip Available":
+            NoZip += 1
+            continue
+        else:
+            try:
+                matchedKey = next(x for x in zipMaster if x.key == currentZip)
+            except:
+                print(transactions.loc[index, "CombinedKey"])
+                print(currentZip)
+                print(currentRegion)
+                print("Error finding matching ZIP ---CONTINUING---")
+                continue
+        
+            if matchedKey.region != currentRegion:
+                transactions.loc[index, "REGION__C"] = matchedKey.region
+                correctedZips += 1
+            else:
+                continue
+    
+    print("NoZip Count: " + str(NoZip))
+
+    return correctedZips
+
+def generateCK():
+    diffCount = 0
+
+    for index, row in creditNote.iterrows():
+        currentCK = creditNote.loc[index, "CombinedKey"]
+        currentNV = creditNote.loc[index, "C2G__NETVALUE__C"]
+
+        if currentNV.is_integer():
+            currentNV = creditNote.loc[index, "C2G__NETVALUE__C"].astype(int)
+        else:
+            currentNV = creditNote.loc[index, "C2G__NETVALUE__C"].astype(float)
+
+        newComboKey = str(creditNote.loc[index, "C2G__CREDITNOTE__C"]) + str(creditNote.loc[index, "C2G__DIMENSION1__C"]) \
+            + str(creditNote.loc[index, "SCMFFA__ITEM_NAME__C"]) + str(currentNV) \
+                + str(creditNote.loc[index, "REGION__C"])
+        
+        if currentCK != newComboKey:
+            creditNote.loc[index, "CombinedKey"] = newComboKey
+            creditNote.loc[index, "NEW KEY"] = "TRUE"
+            diffCount += 1
+
+            if creditNote.loc[index, "NEW REGION"] == "FALSE":
+                print("ERROR KEY: " + newComboKey)
+                print("Original Key: " + currentCK)
+        else:
+            creditNote.loc[index, "NEW KEY"] = "FALSE"
+            continue
+    
+    return diffCount
+
+def generateCKV2():
+    for index, row in creditNote.iterrows():
+        currentNV = creditNote.loc[index, "C2G__NETVALUE__C"]
+
+        if currentNV.is_integer():
+            currentNV = creditNote.loc[index, "C2G__NETVALUE__C"].astype(int)
+        else:
+            currentNV = creditNote.loc[index, "C2G__NETVALUE__C"].astype(float)
+
+        newComboKey = str(creditNote.loc[index, "C2G__CREDITNOTE__C"]) \
+            + str(creditNote.loc[index, "C2G__DIMENSION1__C"]) + str(creditNote.loc[index, "SCMFFA__ITEM_NAME__C"]) + str(currentNV)
+        
+        creditNote.loc[index, "CombinedKey"] = newComboKey
+
+    for index, row in transactions.iterrows():
+        currentHV = transactions.loc[index, "C2G__HOMEVALUE__C"]
+
+        if currentHV.is_integer():
+            currentHV = transactions.loc[index, "C2G__HOMEVALUE__C"].astype(int)
+        else:
+            currentHV = transactions.loc[index, "C2G__HOMEVALUE__C"].astype(float)
+
+        newTransactKey = str(transactions.loc[index, "C2G__TRANSACTION__R.C2G__SALESCREDITNOTE__C"]) \
+            + str(transactions.loc[index, "C2G__DIMENSION1__C"]) + str(transactions.loc[index, "ITEM_MASTER__C"]) + str(currentHV)
+        
+        transactions.loc[index, "CombinedKey"] = newTransactKey
+
+
+print("Changed ZIP Count: " + str(checkZip()))
+# print("Changed Combo Keys: " + str(generateCK()))
+
+generateCKV2()
+
+writer = pd.ExcelWriter('Processed CN2.xlsx', engine = 'xlsxwriter')
+creditNote.to_excel(writer, index = False, sheet_name = 'Data')
+writer.close()
+
+writer = pd.ExcelWriter('Processed TR2.xlsx', engine = 'xlsxwriter')
+transactions.to_excel(writer, index = False, sheet_name = 'Data')
+writer.close()
+
+# #---Debugging---
+# path_creditNoteV2 = "C:\\Users\\patri\\Documents\\Github\\Geography-Zip\\Processed CN.xlsx"
+# creditNoteV2 = pd.read_excel(path_creditNoteV2)
+
+# for index, row in creditNoteV2.iterrows():
+#     newRegion = creditNoteV2.loc[index, "NEW REGION"]
+#     newKey = creditNoteV2.loc[index, "NEW KEY"]
+    
+#     if newRegion == "FALSE" and newKey == "TRUE":
+#         print(str(creditNoteV2.loc[index, "CombinedKey"]))
+#     else:
+#         continue
 
 for index, row in creditNote.iterrows():
     currentKey = creditNote.loc[index, "CombinedKey"]
@@ -120,6 +284,9 @@ def cnCheck():
     return testResult
             
 with open('output.txt', 'w') as f:
+    countCR = 0
+    countTR = 0
+
     f.write("---Credit Note Combination Key + Zip/Zip Counts---" + "\n\n")
     for i in master:
         f.write(i.key + "\n")
@@ -145,6 +312,9 @@ with open('output.txt', 'w') as f:
                     f.write(i.key + "\n")
                     f.write("Credit Note count: " + str(total) + "\n")
                     f.write("Transaction Line count: " + str(y.count) + "\n")
+
+                    countCR += total
+                    countTR += y.count
                     mismatch += 1
 
                     if(total > y.count):
@@ -159,6 +329,8 @@ with open('output.txt', 'w') as f:
     f.write("Total Duplicate Combination Keys in Credit Note: " + str(duplicateCount) + "\n")
     f.write("Total Combination Key Mismatches --- Credit Note VS Transaction Lines: " + str(mismatch) + "\n")
     f.write("Total Invalid Combination Key Count --- Credit Note < Transaction Lines: " + str(invalid) + "\n")
+    f.write("Total Credit Note Mismatch Lines: " + str(countCR) + "\n")
+    f.write("Total Transaction Mismatch Lines: " + str(countTR) + "\n")
     # f.write("Validation of CN Combination Key + Zip Count Result: " + cnCheck())
 
     # -----Process Transactions file w/ Credit Note Results-----
@@ -246,7 +418,9 @@ with open('output.txt', 'w') as f:
                     break
         else:
             continue
-        
+
+    checkZipFINAL()
+
     for i in transactMaster:
         f.write("Transaction Key: " + str(i.key) + "\n")
         f.write("Occurrence: " + str(i.count) + "\n\n")
@@ -282,7 +456,7 @@ with open('output.txt', 'w') as f:
             #     print(matchedKey.totalRemoved)
             #     print(i.count)
         else:
-            f.write("***Transaction Import Invalid - Please reference previous output***" + "\n\n")
+            f.write("***Transaction Import Invalid - Please reference previous output***\n\n")
 
     writer = pd.ExcelWriter('Processed Transactions.xlsx', engine = 'xlsxwriter')
     transactions.to_excel(writer, index = False, sheet_name = 'Data')
