@@ -11,6 +11,7 @@ class combinedKey:
         self.key = key
         self.zipList = zipList
         self.total = 0
+        self.totalRemoved = 0
 
 class transactKey:
     def __init__(self, key):
@@ -23,8 +24,8 @@ master = []
 transactionsKeys = []
 transactMaster = []
 
-path_transactions = "C:\\Users\\PatrickLin\\Downloads\\transactionsZIP.csv"
-path_creditNote = "C:\\Users\\PatrickLin\\Downloads\\salescreditnoteZIP.csv"
+path_transactions = "C:\\Users\\PatrickLin\\Documents\\trn_lines.csv"
+path_creditNote = "C:\\Users\\PatrickLin\\Documents\\sc_lines.csv"
 
 transactions = pd.read_csv(path_transactions)
 creditNote = pd.read_csv(path_creditNote)
@@ -33,7 +34,7 @@ duplicateCount = 0
 
 for index, row in creditNote.iterrows():
     currentKey = creditNote.loc[index, "CombinedKey"]
-    currentZip = creditNote.loc[index, "zip_area__c"]
+    currentZip = creditNote.loc[index, "ZIP_AREA__C"]
     # print(currentKey)
 
     zc = zipCount(currentZip, 1)
@@ -100,7 +101,7 @@ def cnCheck():
 
             for index, row in creditNote.iterrows():
                 tempKey = creditNote.loc[index, "CombinedKey"]
-                tempZip = creditNote.loc[index, "zip_area__c"]
+                tempZip = creditNote.loc[index, "ZIP_AREA__C"]
 
                 # print(tempKey)
                 # print(tempZip)
@@ -119,7 +120,7 @@ def cnCheck():
     return testResult
             
 with open('output.txt', 'w') as f:
-    f.write("---Credit Note Combination Key + Zip/Zip Counts---" + "\n")
+    f.write("---Credit Note Combination Key + Zip/Zip Counts---" + "\n\n")
     for i in master:
         f.write(i.key + "\n")
 
@@ -204,6 +205,85 @@ with open('output.txt', 'w') as f:
     
     sortZIP()
 
-    f.write("Master List ZIPs Sorted Successfully: " + str(checkSort()) + "\n")
-
+    f.write("Master List ZIPs Sorted Successfully: " + str(checkSort()) + "\n\n")
     
+    f.write("---Transaction Line Key Count---" + "\n\n")
+
+    def validImport(x):
+        for y in transactMaster:
+            if x.key == y.key:
+                if x.total != y.count:
+                    if(x.total > y.count):
+                        return True
+                    else:
+                        return False
+                else:
+                    return True
+    
+    for index, row in transactions.iterrows():
+        transactCK = transactions.loc[index, "CombinedKey"]
+
+        try:
+            matchedKey = next(x for x in master if x.key == transactCK)
+
+            # f.write("Master Key: " + str(matchedKey.key) + "\n")
+            # f.write("Transaction Key: " + str(transactCK) + "\n")
+            # print(matchedKey.key)
+            # print(transactCK)
+        except:
+            continue
+
+        # matchedCount = next(y.count for y in transactMaster if y.key == transactCK)
+
+        if validImport(matchedKey):
+            for a in matchedKey.zipList:
+                if(a.count == 0):
+                    continue
+                else:
+                    transactions.loc[index, "ZIP"] = a.zip
+                    a.count -= 1
+                    matchedKey.totalRemoved += 1
+                    break
+        else:
+            continue
+        
+    for i in transactMaster:
+        f.write("Transaction Key: " + str(i.key) + "\n")
+        f.write("Occurrence: " + str(i.count) + "\n\n")
+
+    f.write("---Transaction VS Master ZIP Count---" + "\n\n")
+
+    for i in transactMaster:
+        try:
+            matchedKey = next(x for x in master if x.key == i.key)
+        except:
+            continue
+        
+        count = 0
+
+        f.write("Current Transaction Key: " + i.key + "\n")
+        f.write("Current Master Key: " + matchedKey.key + "\n")
+
+        if validImport(matchedKey):
+            for a in matchedKey.zipList:
+                count += a.count
+
+            f.write("Processed ZIP Count from Master: " + str(count) + "\n")
+            f.write("Total Original ZIP from Master: " + str(matchedKey.total) + "\n")
+            f.write("Total ZIP Removed from Master: " + str(matchedKey.totalRemoved) + "\n")
+            f.write("Total Transact Count: " + str(i.count) + "\n\n")
+
+            if count + i.count == matchedKey.total:
+                continue
+            # else:
+            #     print("ERROR")
+            #     print(matchedKey.key)
+            #     print(matchedKey.total)
+            #     print(matchedKey.totalRemoved)
+            #     print(i.count)
+        else:
+            f.write("***Transaction Import Invalid - Please reference previous output***" + "\n\n")
+
+    writer = pd.ExcelWriter('Processed Transactions.xlsx', engine = 'xlsxwriter')
+    transactions.to_excel(writer, index = False, sheet_name = 'Data')
+    writer.close()
