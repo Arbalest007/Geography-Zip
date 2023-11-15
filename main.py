@@ -1,5 +1,4 @@
 import pandas as pd
-import random
 
 class zipCount:
     def __init__(self, zip, count):
@@ -23,6 +22,11 @@ class zip:
         self.key = key
         self.region = region
 
+class outlier:
+    def __init__(self, key):
+        self.key = key
+        self.count = 1
+
 processedKeys = []
 master = []
 
@@ -40,7 +44,9 @@ creditNote = pd.read_csv(path_creditNote)
 zipArea = pd.read_csv(path_zipArea)
 
 duplicateCount = 0
+duplicateCountTransact = 0
 
+# Fetch list of each ZIP and their associated region from ZIP Area Excel file
 for index, row in zipArea.iterrows():
     currentZip = zipArea.loc[index, "ID"]
     currentRegion = zipArea.loc[index, "REGION__C"]
@@ -49,6 +55,7 @@ for index, row in zipArea.iterrows():
 
     zipMaster.append(newZip)
 
+# Correct ZIP based on whether the region matches in Credit Note
 def checkZip():
     correctedZips = 0
     NoZip = 0
@@ -57,10 +64,12 @@ def checkZip():
         currentZip = creditNote.loc[index, "ZIP_AREA__C"]
         currentRegion = creditNote.loc[index, "REGION__C"]
 
+        # Skip if No Zip Available to avoid error. Counter to make sure skips match
         if currentZip == "No Zip Available":
             NoZip += 1
             continue
         else:
+            # Else, try finding the ZIP. If it doesn't exist in ZIP master list then print error
             try:
                 matchedKey = next(x for x in zipMaster if x.key == currentZip)
             except:
@@ -68,7 +77,10 @@ def checkZip():
                 print(currentRegion)
                 print("Error finding matching ZIP ---CONTINUING---")
                 continue
-        
+                
+            # Otherwise, we correct the region if it is different and then add a column as a flag 
+            # indicating whether the region was changed for debugging. Then add one to counter 
+            # for how many ZIPs were corrected
             if matchedKey.region != currentRegion:
                 creditNote.loc[index, "REGION__C"] = matchedKey.region
                 creditNote.loc[index, "NEW REGION"] = "TRUE"
@@ -77,10 +89,14 @@ def checkZip():
                 creditNote.loc[index, "NEW REGION"] = "FALSE"
                 continue
     
+    # ---Debugging---
+    # Print out total "No Zip Available" counted to make sure numbers match up
     print("NoZip Count: " + str(NoZip))
 
+    # Return number of ZIPs where region was different
     return correctedZips
 
+# Altered ZIP correction of above function to work on Transactions
 def checkZipFINAL():
     correctedZips = 0
     NoZip = 0
@@ -108,10 +124,13 @@ def checkZipFINAL():
             else:
                 continue
     
-    print("NoZip Count: " + str(NoZip))
+    # Make a tuple out of the results and return it
+    checkResults = (NoZip, correctedZips)
+    return checkResults
 
-    return correctedZips
-
+# Generate a Combo Key based on original formula for Credit Note
+# Do a comparison check first to make sure the combo keys don't match before replacing them.
+# Update NEW KEY flag for debugging
 def generateCK():
     diffCount = 0
 
@@ -142,6 +161,8 @@ def generateCK():
     
     return diffCount
 
+# Generate a Combo Key based on original formula w/o Region for both Credit Note and Transactions
+# Do this for every row since it will be a new key for everything
 def generateCKV2():
     for index, row in creditNote.iterrows():
         currentNV = creditNote.loc[index, "C2G__NETVALUE__C"]
@@ -170,16 +191,25 @@ def generateCKV2():
         transactions.loc[index, "CombinedKey"] = newTransactKey
 
 
-print("Changed ZIP Count: " + str(checkZip()))
+# print("Changed ZIP Count: " + str(checkZip()))
 # print("Changed Combo Keys: " + str(generateCK()))
+
+#----------------------------------------------------------------------------------------------------------------
+#----------------------------------------------------------------------------------------------------------------
+#----------------------------------------------------------------------------------------------------------------
+# IMPORT CODE
+#----------------------------------------------------------------------------------------------------------------
+#----------------------------------------------------------------------------------------------------------------
+#----------------------------------------------------------------------------------------------------------------
 
 generateCKV2()
 
-writer = pd.ExcelWriter('Processed CN2.xlsx', engine = 'xlsxwriter')
+#Output the Transactions and Credit Note with new combo keys
+writer = pd.ExcelWriter('Processed CN.xlsx', engine = 'xlsxwriter')
 creditNote.to_excel(writer, index = False, sheet_name = 'Data')
 writer.close()
 
-writer = pd.ExcelWriter('Processed TR2.xlsx', engine = 'xlsxwriter')
+writer = pd.ExcelWriter('Processed TR.xlsx', engine = 'xlsxwriter')
 transactions.to_excel(writer, index = False, sheet_name = 'Data')
 writer.close()
 
@@ -196,6 +226,8 @@ writer.close()
 #     else:
 #         continue
 
+# Iterate through Credit Note and record the ZIPs associated with each Combo Key
+# Keep track of how many new Combo Keys with master list
 for index, row in creditNote.iterrows():
     currentKey = creditNote.loc[index, "CombinedKey"]
     currentZip = creditNote.loc[index, "ZIP_AREA__C"]
@@ -239,7 +271,7 @@ for index, row in creditNote.iterrows():
                     
         duplicateCount += 1
 
-# Error Checking - Comparing total counts of CombinedKeys in Transaction Lines to Credit Note
+# Count unique combo keys and their repititions from transactions
 for index, row in transactions.iterrows():
     currentKey = transactions.loc[index, "CombinedKey"]
     
@@ -252,8 +284,12 @@ for index, row in transactions.iterrows():
         for i in transactMaster:
             if i.key == currentKey:
                 i.count += 1
+                duplicateCountTransact += 1
                 break
 
+# Error Checking - Comparing total counts of CombinedKeys in Transaction Lines to Credit Note
+# Naive check to make sure the counts of ZIP and Combo Key all match up
+# Slow but accurate
 def cnCheck():
     testResult = "PASS"
 
@@ -297,6 +333,7 @@ with open('output.txt', 'w') as f:
         
         f.write("\n")
 
+    f.write("-----IMPORT VALIDATION-----\n\n")
     f.write("---Combination Key Checking---\n\n")
     mismatch = 0
     invalid = 0
@@ -324,15 +361,31 @@ with open('output.txt', 'w') as f:
                         invalid += 1
                 else:
                     continue
+    
+    if mismatch == 0 and invalid == 0:
+        f.write("Combo Key Check Results: Both files are 1-to-1\n")
+    else:
+        f.write("ERROR\n")
+        f.write("Total Combination Key Mismatches --- Credit Note VS Transaction Lines: " + str(mismatch) + "\n")
+        f.write("Total Invalid Combination Key Count --- Credit Note < Transaction Lines: " + str(invalid) + "\n")
 
     f.write("Total Unique Combination Keys - Credit Note: " + str(len(master)) + "\n")
+    f.write("Total Unique Combination Keys - Transactions: " + str(len(transactMaster)) + "\n")
     f.write("Total Duplicate Combination Keys in Credit Note: " + str(duplicateCount) + "\n")
-    f.write("Total Combination Key Mismatches --- Credit Note VS Transaction Lines: " + str(mismatch) + "\n")
-    f.write("Total Invalid Combination Key Count --- Credit Note < Transaction Lines: " + str(invalid) + "\n")
+    f.write("Total Duplicate Combination Keys in Credit Note: " + str(duplicateCountTransact) + "\n")
     f.write("Total Credit Note Mismatch Lines: " + str(countCR) + "\n")
-    f.write("Total Transaction Mismatch Lines: " + str(countTR) + "\n")
+    f.write("Total Transaction Mismatch Lines: " + str(countTR) + "\n\n")
     # f.write("Validation of CN Combination Key + Zip Count Result: " + cnCheck())
 
+    #----------------------------------------------------------------------------------------------------------------
+    #----------------------------------------------------------------------------------------------------------------
+    #----------------------------------------------------------------------------------------------------------------
+    # EXPORT CODE
+    #----------------------------------------------------------------------------------------------------------------
+    #----------------------------------------------------------------------------------------------------------------
+    #----------------------------------------------------------------------------------------------------------------
+
+    f.write("-----EXPORT VALIDATION-----\n\n")
     # -----Process Transactions file w/ Credit Note Results-----
 
     def checkCount():
@@ -350,15 +403,18 @@ with open('output.txt', 'w') as f:
         
         return match
 
-    f.write("All Totals Match Sum of ZIP Counts: " + str(checkCount()) + "\n")
+    # Sanity check that ZIP Counts still match
+    f.write("All Totals Match Sum of ZIP Counts in CN: " + str(checkCount()) + "\n")
 
     def returnZIPCount(x):
         return x.count
 
+    # Sort ZIP by ascending order
     def sortZIP():
         for i in master:
             i.zipList.sort(key = lambda x: x.count)
 
+    # Check previous sort results
     def checkSort():
         sorted = True
 
@@ -378,8 +434,12 @@ with open('output.txt', 'w') as f:
     sortZIP()
 
     f.write("Master List ZIPs Sorted Successfully: " + str(checkSort()) + "\n\n")
-    
-    f.write("---Transaction Line Key Count---" + "\n\n")
+
+    # # Print Transaction Keys and their count
+    # f.write("---Transaction Line Key Count---" + "\n\n")
+    # for i in transactMaster:
+    #     f.write("Transaction Key: " + str(i.key) + "\n")
+    #     f.write("Occurrence: " + str(i.count) + "\n\n")
 
     def validImport(x):
         for y in transactMaster:
@@ -392,18 +452,39 @@ with open('output.txt', 'w') as f:
                 else:
                     return True
     
+    f.write("---Transaction Key Outliers---\n\n")
+
+    # Count Outliers
+    outlierTotal = 0 
+    outlierMaster = []
+    outliers = []
+
+    # For each transaction, try to find a matching combo key in master
+    # If the combo key is a valid import, then begin assigning ZIPs to Transactions from Credit Note
+    # Else, track the outlier key and output it later
     for index, row in transactions.iterrows():
         transactCK = transactions.loc[index, "CombinedKey"]
 
         try:
             matchedKey = next(x for x in master if x.key == transactCK)
-
             # f.write("Master Key: " + str(matchedKey.key) + "\n")
             # f.write("Transaction Key: " + str(transactCK) + "\n")
             # print(matchedKey.key)
             # print(transactCK)
         except:
-            continue
+            if transactCK not in outlierMaster:
+                outlierMaster.append(transactCK)
+                newOutlier = outlier(transactCK)
+                outliers.append(newOutlier)
+                outlierTotal += 1
+                continue
+            else:
+                for i in outliers:
+                    if i.key == transactCK:
+                        i.count += 1
+                        outlierTotal += 1
+                        break
+                continue
 
         # matchedCount = next(y.count for y in transactMaster if y.key == transactCK)
 
@@ -419,18 +500,26 @@ with open('output.txt', 'w') as f:
         else:
             continue
 
-    checkZipFINAL()
+    f.write("Total TR Outliers: " + str(outlierTotal) + "\n")
+    f.write("Total Unique TR Outliers: " + str(len(outliers)) + "\n\n")
+    for i in outliers:
+        f.write("TR Key: " + i.key + "\n")
+        f.write("Count: " + str(i.count) + "\n\n")
 
-    for i in transactMaster:
-        f.write("Transaction Key: " + str(i.key) + "\n")
-        f.write("Occurrence: " + str(i.count) + "\n\n")
+    f.write("---Transaction VS Master ZIP Validation---" + "\n\n")
 
-    f.write("---Transaction VS Master ZIP Count---" + "\n\n")
+    # For each transaction, try to find a matching combo key in master
+    # If the combo key is a valid import, then begin assigning ZIPs to Transactions from Credit Note
+    invalidMissing = 0
+    invalidMismatch = 0
 
     for i in transactMaster:
         try:
             matchedKey = next(x for x in master if x.key == i.key)
         except:
+            invalidMissing += 1
+            f.write("Current Transaction Key: " + i.key + "\n")
+            f.write("***IMPORT INVALID - Missing Key***\n\n")
             continue
         
         count = 0
@@ -456,8 +545,12 @@ with open('output.txt', 'w') as f:
             #     print(matchedKey.totalRemoved)
             #     print(i.count)
         else:
-            f.write("***Transaction Import Invalid - Please reference previous output***\n\n")
+            invalidMismatch += 1
+            f.write("***IMPORT INVALID - Mismatch***\n\n")
+        
+    f.write("Total Invalid Missing: " + str(invalidMissing) + "\n")
+    f.write("Total Invalid Mismatch: " + str(invalidMismatch))
 
-    writer = pd.ExcelWriter('Processed Transactions.xlsx', engine = 'xlsxwriter')
+    writer = pd.ExcelWriter('Final Transactions.xlsx', engine = 'xlsxwriter')
     transactions.to_excel(writer, index = False, sheet_name = 'Data')
     writer.close()
