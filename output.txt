@@ -26092,7 +26092,7 @@ Combo Key Check Results: Both files are 1-to-1
 Total Unique Combination Keys - Credit Note: 6216
 Total Unique Combination Keys - Transactions: 5882
 Total Duplicate Combination Keys in Credit Note: 3386
-Total Duplicate Combination Keys in Credit Note: 3249
+Total Duplicate Combination Keys in Transactions: 3249
 Total Credit Note Mismatch Lines: 0
 Total Transaction Mismatch Lines: 0
 
@@ -26103,6 +26103,7 @@ Master List ZIPs Sorted Successfully: True
 
 ---Transaction Key Outliers---
 
+Total TR Processed: 9114
 Total TR Outliers: 17
 Total Unique TR Outliers: 15
 
@@ -67269,3 +67270,9 @@ Total Transact Count: 1
 
 Total Invalid Missing: 15
 Total Invalid Mismatch: 0
+
+---ZIP CORRECTION---
+
+Total No Zip Available: 782
+Total Zip Missing: 799
+Total Region Corrections: 1188

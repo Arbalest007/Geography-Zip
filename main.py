@@ -105,7 +105,7 @@ def checkZipFINAL():
         currentZip = transactions.loc[index, "ZIP"]
         currentRegion = transactions.loc[index, "REGION__C"]
 
-        if currentZip == "No Zip Available":
+        if currentZip == "No Zip Available" or currentZip == "nan":
             NoZip += 1
             continue
         else:
@@ -372,7 +372,7 @@ with open('output.txt', 'w') as f:
     f.write("Total Unique Combination Keys - Credit Note: " + str(len(master)) + "\n")
     f.write("Total Unique Combination Keys - Transactions: " + str(len(transactMaster)) + "\n")
     f.write("Total Duplicate Combination Keys in Credit Note: " + str(duplicateCount) + "\n")
-    f.write("Total Duplicate Combination Keys in Credit Note: " + str(duplicateCountTransact) + "\n")
+    f.write("Total Duplicate Combination Keys in Transactions: " + str(duplicateCountTransact) + "\n")
     f.write("Total Credit Note Mismatch Lines: " + str(countCR) + "\n")
     f.write("Total Transaction Mismatch Lines: " + str(countTR) + "\n\n")
     # f.write("Validation of CN Combination Key + Zip Count Result: " + cnCheck())
@@ -458,6 +458,7 @@ with open('output.txt', 'w') as f:
     outlierTotal = 0 
     outlierMaster = []
     outliers = []
+    validTransact = 0
 
     # For each transaction, try to find a matching combo key in master
     # If the combo key is a valid import, then begin assigning ZIPs to Transactions from Credit Note
@@ -467,6 +468,7 @@ with open('output.txt', 'w') as f:
 
         try:
             matchedKey = next(x for x in master if x.key == transactCK)
+            validTransact += 1
             # f.write("Master Key: " + str(matchedKey.key) + "\n")
             # f.write("Transaction Key: " + str(transactCK) + "\n")
             # print(matchedKey.key)
@@ -499,20 +501,26 @@ with open('output.txt', 'w') as f:
                     break
         else:
             continue
-
+    
+    f.write("Total TR Processed: " + str(validTransact) + "\n")
     f.write("Total TR Outliers: " + str(outlierTotal) + "\n")
     f.write("Total Unique TR Outliers: " + str(len(outliers)) + "\n\n")
     for i in outliers:
         f.write("TR Key: " + i.key + "\n")
         f.write("Count: " + str(i.count) + "\n\n")
 
+    # Count No Zip Available
+    countNoZIP = 0
+    for index, row in transactions.iterrows():
+        if transactions.loc[index, "ZIP"] == "No Zip Available":
+            countNoZIP += 1
+
     f.write("---Transaction VS Master ZIP Validation---" + "\n\n")
 
-    # For each transaction, try to find a matching combo key in master
-    # If the combo key is a valid import, then begin assigning ZIPs to Transactions from Credit Note
     invalidMissing = 0
     invalidMismatch = 0
 
+    # Further validation of the results after assigning ZIPs
     for i in transactMaster:
         try:
             matchedKey = next(x for x in master if x.key == i.key)
@@ -534,10 +542,15 @@ with open('output.txt', 'w') as f:
             f.write("Processed ZIP Count from Master: " + str(count) + "\n")
             f.write("Total Original ZIP from Master: " + str(matchedKey.total) + "\n")
             f.write("Total ZIP Removed from Master: " + str(matchedKey.totalRemoved) + "\n")
-            f.write("Total Transact Count: " + str(i.count) + "\n\n")
+            f.write("Total Transact Count: " + str(i.count) + "\n")
 
-            if count + i.count == matchedKey.total:
-                continue
+            if i.count != matchedKey.totalRemoved:
+                f.write("***FATAL DATA ERROR***\n\n")
+            else:
+                f.write("\n")
+
+            # if count + i.count == matchedKey.total:
+            #     continue
             # else:
             #     print("ERROR")
             #     print(matchedKey.key)
@@ -549,7 +562,13 @@ with open('output.txt', 'w') as f:
             f.write("***IMPORT INVALID - Mismatch***\n\n")
         
     f.write("Total Invalid Missing: " + str(invalidMissing) + "\n")
-    f.write("Total Invalid Mismatch: " + str(invalidMismatch))
+    f.write("Total Invalid Mismatch: " + str(invalidMismatch) + "\n\n")
+
+    f.write("---ZIP CORRECTION---\n\n")
+    zipValidation = checkZipFINAL()
+    f.write("Total No Zip Available: " + str(countNoZIP) + "\n")
+    f.write("Total Zip Missing: " + str(zipValidation[0]) + "\n")
+    f.write("Total Region Corrections: " + str(zipValidation[1]))
 
     writer = pd.ExcelWriter('Final Transactions.xlsx', engine = 'xlsxwriter')
     transactions.to_excel(writer, index = False, sheet_name = 'Data')
